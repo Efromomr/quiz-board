@@ -4,8 +4,8 @@ import { Server } from "socket.io";
 import { createServer } from "http";
 
 
-const httpServer = createServer(fastify.server);
 const fastify = Fastify();
+const httpServer = createServer(fastify.server);
 const PORT = Number(process.env.PORT) || 3001;
 const CLIENT_ORIGIN =
   process.env.CLIENT_ORIGIN || "*";
