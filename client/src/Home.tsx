@@ -28,7 +28,7 @@ export default function Home({
     onSetName(name);
     setError("");
 
-    const res = await fetch("http://localhost:3001/create-game", {
+    const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/create-game`, {
       method: "POST"
     });
 
