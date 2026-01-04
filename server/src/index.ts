@@ -3,10 +3,12 @@ import cors from "@fastify/cors";
 import { Server } from "socket.io";
 import { createServer } from "http";
 
+
+const httpServer = createServer(fastify.server);
 const fastify = Fastify();
 const PORT = Number(process.env.PORT) || 3001;
 const CLIENT_ORIGIN =
-  process.env.CLIENT_ORIGIN || "http://localhost:3000";
+  process.env.CLIENT_ORIGIN || "*";
 
 
 const TURN_TIME_MS = 30_000;
@@ -138,8 +140,8 @@ async function start() {
   return { gameId };
 });
 
-  const io = new Server(fastify.server, {
-    cors: { origin: "*" }
+  const io = new Server(httpServer, {
+    cors: { origin: CLIENT_ORIGIN }
   });
 
 /* ------------------ Socket Logic ------------------ */
