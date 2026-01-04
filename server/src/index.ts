@@ -377,7 +377,7 @@ io.on("connection", (socket) => {
 
 /* ------------------ Start Server ------------------ */
 
-  await fastify.listen({
+  await httpServer.listen({
   port: PORT,
   host: "0.0.0.0"
 });
