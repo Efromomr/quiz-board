@@ -1,0 +1,7 @@
+{
+  "name": "dnd-multiplayer-mvp",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel dev"
+  }
+}
