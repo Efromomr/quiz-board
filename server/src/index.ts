@@ -141,7 +141,8 @@ async function start() {
 });
 
   const io = new Server(httpServer, {
-    cors: { origin: CLIENT_ORIGIN }
+    cors: { origin: CLIENT_ORIGIN },
+	transports: ["websocket"]
   });
 
 /* ------------------ Socket Logic ------------------ */
