@@ -47,6 +47,16 @@ export default function Lobby({
     value: number;
     question: Question;
   } | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  // Update time every second to refresh countdown
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
   const onConnect = () => {
@@ -57,6 +67,10 @@ export default function Lobby({
 
   socket.on("game-state", (state: GameState) => {
     setGame(state);
+    // Clear question if questionEndsAt is not set or has passed
+    if (!state.questionEndsAt || state.questionEndsAt < Date.now()) {
+      setQuestion(null);
+    }
   });
 
   socket.on("question", (q) => {
@@ -75,6 +89,33 @@ export default function Lobby({
   };
 }, [gameId, name]);
 
+  // Clear question when time expires
+  useEffect(() => {
+    if (!game || !question) return;
+
+    const checkTimeout = () => {
+      const currentTime = Date.now();
+      
+      // Clear question if question time has expired
+      if (game.questionEndsAt && currentTime >= game.questionEndsAt) {
+        setQuestion(null);
+        return;
+      }
+
+      // Clear question if turn time has expired (and there's a question)
+      if (game.turnEndsAt && currentTime >= game.turnEndsAt) {
+        setQuestion(null);
+        return;
+      }
+    };
+
+    checkTimeout();
+    // Check every 100ms for more responsive timeout handling
+    const interval = setInterval(checkTimeout, 100);
+
+    return () => clearInterval(interval);
+  }, [game, question, now]);
+
 
   if (!game) return <p>Loading game...</p>;
 
@@ -87,7 +128,6 @@ export default function Lobby({
   const isGameOver = !!game.winnerId;
   const notEnoughPlayers = game.players.length < 2;
   
-  const now = Date.now();
   const turnTimeLeft = game.turnEndsAt
   ? Math.max(0, Math.ceil((game.turnEndsAt - now) / 1000))
   : null;
