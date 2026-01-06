@@ -118,7 +118,8 @@ const sessions = new Map<string, GameSession>();
 
 async function start() {
   await fastify.register(cors, {
-    origin: CLIENT_ORIGIN
+    origin: CLIENT_ORIGIN,
+	methods: ["GET", "POST"]
   });
 
   fastify.get("/", async () => {
