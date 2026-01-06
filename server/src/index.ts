@@ -177,7 +177,7 @@ async function start() {
       });
     });
   });
-
+  await fastify.ready();
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
