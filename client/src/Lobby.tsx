@@ -45,21 +45,27 @@ export default function Lobby({
   } | null>(null);
 
   useEffect(() => {
+  const onConnect = () => {
     socket.emit("join-game", { gameId, name });
+  };
 
-    socket.on("game-state", (state: GameState) => {
-      setGame(state);
-    });
+  socket.on("connect", onConnect);
 
-    socket.on("question", (q) => {
-      setQuestion(q);
-    });
+  socket.on("game-state", (state: GameState) => {
+    setGame(state);
+  });
 
-    return () => {
-      socket.off("game-state");
-      socket.off("question");
-    };
-  }, [gameId, name]);
+  socket.on("question", (q) => {
+    setQuestion(q);
+  });
+
+  return () => {
+    socket.off("connect", onConnect);
+    socket.off("game-state");
+    socket.off("question");
+  };
+}, [gameId, name]);
+
 
   if (!game) return <p>Loading game...</p>;
 
