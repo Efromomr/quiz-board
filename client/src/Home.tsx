@@ -47,15 +47,7 @@ export default function Home({
   }
 
   return (
-    <div
-      style={{
-        padding: 40,
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        maxWidth: 420
-      }}
-    >
+    <div className="home-container">
       <h1>DND Multiplayer MVP</h1>
 
       <input
@@ -93,7 +85,7 @@ export default function Home({
         </>
       )}
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className="error">{error}</p>}
     </div>
   );
 }

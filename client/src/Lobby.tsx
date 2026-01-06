@@ -117,7 +117,7 @@ export default function Lobby({
   }, [game, question, now]);
 
 
-  if (!game) return <p>Loading game...</p>;
+  if (!game) return <div className="loading">Loading game...</div>;
 
   const myTurn =
     game.players[game.currentTurn]?.id === socket.id;
@@ -138,28 +138,42 @@ export default function Lobby({
 
 
   return (
-    <div style={{ padding: 24 }}>
+    <div className="lobby-container">
       <h2>Quiz Board Game</h2>
 	  
-	  <p>
-        <strong>Lobby ID:</strong>{" "}
-        <code>{game.id}</code>
-      </p>
+	  <div className="lobby-info">
+        <p>
+          <strong>Lobby ID:</strong>{" "}
+          <code>{game.id}</code>
+        </p>
 
-
-      <p>
-        <strong>Current turn:</strong>{" "}
-        {activePlayer?.name}
-      </p>
+        <p>
+          <strong>Current turn:</strong>{" "}
+          {activePlayer?.name}
+        </p>
 	  
-	  {turnTimeLeft !== null && (
-  <p>⏱ Turn ends in: {turnTimeLeft}s</p>
-)}
+        {turnTimeLeft !== null && (
+          <p className="timer">⏱ Turn ends in: {turnTimeLeft}s</p>
+        )}
 
-{questionTimeLeft !== null && (
-  <p>⏱ Answer time left: {questionTimeLeft}s</p>
-)}
+        {questionTimeLeft !== null && (
+          <p className="timer">⏱ Answer time left: {questionTimeLeft}s</p>
+        )}
+      </div>
 
+      <div className="players-list">
+        <h3>Players</h3>
+        <div className="players-grid">
+          {game.players.map((player, index) => (
+            <div key={player.id} className="player-item">
+              <div className={`player-token player-color-${index % 6}`} />
+              <span className={player.id === socket.id ? "current-player" : ""}>
+                {player.name} {player.id === socket.id && "(You)"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <Board
         board={game.board}
@@ -167,57 +181,47 @@ export default function Lobby({
       />
 	  
 	  {isGameOver && (
-  <div
-    style={{
-      marginTop: 24,
-      padding: 16,
-      background: "#d4edda",
-      border: "1px solid #c3e6cb"
-    }}
-  >
-    <h2>
-      🏆 Winner:{" "}
-      {
-        game.players.find(
-          (p) => p.id === game.winnerId
-        )?.name
-      }
-    </h2>
-    <p>The game is finished.</p>
-  </div>
+        <div className="winner-banner">
+          <h2>
+            🏆 Winner:{" "}
+            {
+              game.players.find(
+                (p) => p.id === game.winnerId
+              )?.name
+            }
+          </h2>
+          <p>The game is finished.</p>
+        </div>
+      )}
 
-)}
-
-{isGameOver && (
-  <button
-    style={{ marginTop: 12 }}
-    onClick={() =>
-      socket.emit("restart-game", { gameId })
-    }
-  >
-    🔄 Restart Game
-  </button>
-)}
-
+      {isGameOver && (
+        <button
+          className="game-button"
+          onClick={() =>
+            socket.emit("restart-game", { gameId })
+          }
+        >
+          🔄 Restart Game
+        </button>
+      )}
 
       {myTurn && !question && !isGameOver && (
-  <button
-    style={{ marginTop: 16, padding: 10 }}
-    disabled={notEnoughPlayers}
-    onClick={() =>
-      socket.emit("roll-dice", { gameId })
-    }
-  >
-    🎲 Roll Dice
-  </button>
-)}
+        <button
+          className="game-button"
+          disabled={notEnoughPlayers}
+          onClick={() =>
+            socket.emit("roll-dice", { gameId })
+          }
+        >
+          🎲 Roll Dice
+        </button>
+      )}
 
-{notEnoughPlayers && (
-  <p style={{ color: "gray" }}>
-    Waiting for at least one more player...
-  </p>
-)}
-
+      {notEnoughPlayers && (
+        <p className="waiting-message">
+          Waiting for at least one more player...
+        </p>
+      )}
 
       <QuestionModal
         open={!!question}
@@ -232,7 +236,7 @@ export default function Lobby({
         }}
       />
 
-      <div style={{ marginTop: 24 }}>
+      <div className="game-log">
         <h3>Game Log</h3>
         <ul>
           {game.log.map((entry, i) => (

@@ -17,60 +17,37 @@ export default function Board({
   board: BoardField[];
   players: Player[];
 }) {
+  // Helper function to get player color class based on their index in the players array
+  const getPlayerColorClass = (playerId: string): string => {
+    const playerIndex = players.findIndex((p) => p.id === playerId);
+    return `player-color-${playerIndex % 6}`;
+  };
+
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(10, 50px)",
-        gap: 4,
-        marginTop: 20
-      }}
-    >
+    <div className="board-container">
       {board.map((field) => {
         const playersHere = players.filter(
           (p) => p.position === field.index
         );
 
-        let bg = "#eee";
-        if (field.type === "BOOST") bg = "#b6fcb6";
-        if (field.type === "TRAP") bg = "#fcb6b6";
+        const fieldClass = `board-field ${
+          field.type === "BOOST"
+            ? "boost"
+            : field.type === "TRAP"
+            ? "trap"
+            : "normal"
+        }`;
 
         return (
-          <div
-            key={field.index}
-            style={{
-              width: 50,
-              height: 50,
-              background: bg,
-              border: "1px solid #999",
-              fontSize: 10,
-              position: "relative",
-              padding: 2
-            }}
-          >
+          <div key={field.index} className={fieldClass}>
             <div>{field.index}</div>
 
-            <div
-              style={{
-                position: "absolute",
-                bottom: 2,
-                left: 2,
-                right: 2,
-                display: "flex",
-                gap: 2,
-                flexWrap: "wrap"
-              }}
-            >
+            <div className="players-on-field">
               {playersHere.map((p) => (
                 <div
                   key={p.id}
                   title={p.name}
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    background: "blue"
-                  }}
+                  className={`player-token ${getPlayerColorClass(p.id)}`}
                 />
               ))}
             </div>

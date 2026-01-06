@@ -22,24 +22,8 @@ export default function QuestionModal({
   const { fieldType, value, question } = data;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: 24,
-          maxWidth: 400,
-          width: "100%"
-        }}
-      >
+    <div className="question-modal-overlay">
+      <div className="question-modal-content">
         <h3>
           {fieldType === "BOOST"
             ? `Correct → move +${value}`
@@ -51,11 +35,7 @@ export default function QuestionModal({
         {question.options.map((opt, i) => (
           <button
             key={i}
-            style={{
-              display: "block",
-              width: "100%",
-              marginBottom: 8
-            }}
+            className="question-option-button"
             onClick={() => onAnswer(i)}
           >
             {opt}
