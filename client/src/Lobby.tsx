@@ -28,7 +28,11 @@ type GameState = {
   board: BoardField[];
   currentTurn: number;
   log: string[];
+  winnerId?: string;
+  turnEndsAt?: number;
+  questionEndsAt?: number;
 };
+
 
 export default function Lobby({
   gameId,
