@@ -63,6 +63,11 @@ export default function Lobby({
     setQuestion(q);
   });
 
+  // If socket is already connected, emit join-game immediately
+  if (socket.connected) {
+    socket.emit("join-game", { gameId, name });
+  }
+
   return () => {
     socket.off("connect", onConnect);
     socket.off("game-state");
