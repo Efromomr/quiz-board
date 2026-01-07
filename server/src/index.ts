@@ -50,6 +50,7 @@ type GameSession = {
   winnerId?: string;
   turnEndsAt?: number;
   questionEndsAt?: number;
+  connectedPlayers: Set<string>; // Set of playerIds that are currently connected
 };
 
 /* ------------------ Helpers ------------------ */
@@ -82,6 +83,8 @@ function createBoard(size: number): BoardField[] {
 /* ------------------ Sessions ------------------ */
 
 const sessions = new Map<string, GameSession>();
+// Map to track socketId -> playerId for quick lookups
+const socketToPlayerId = new Map<string, string>();
 
 /* ------------------ Bootstrap ------------------ */
 
@@ -112,7 +115,8 @@ async function start() {
       board: createBoard(40),
       currentTurn: 0,
       questions: questions,
-      log: []
+      log: [],
+      connectedPlayers: new Set()
     });
 
     return { gameId };
@@ -133,21 +137,42 @@ async function start() {
   io.on("connection", (socket) => {
     console.log("Client connected:", socket.id);
 
-    socket.on("join-game", ({ gameId, name }) => {
+    socket.on("join-game", ({ gameId, name, playerId }) => {
       const session = sessions.get(gameId);
       if (!session) return;
 
-      session.players = session.players.filter(
-        (p) => p.id !== socket.id
-      );
+      // Track socketId -> playerId mapping
+      socketToPlayerId.set(socket.id, playerId);
 
-      session.players.push({
-        id: socket.id,
-        name,
-        position: 0
-      });
+      // Find existing player or create new one
+      let player = session.players.find((p) => p.id === playerId);
+      const isRejoining = !!player && !session.connectedPlayers.has(playerId);
 
-      if (session.players.length === 2 && !session.turnEndsAt) {
+      if (!player) {
+        // New player joining
+        player = {
+          id: playerId,
+          name,
+          position: 0
+        };
+        session.players.push(player);
+      } else {
+        // Existing player rejoining - update name in case it changed
+        player.name = name;
+      }
+
+      // Mark player as connected
+      session.connectedPlayers.add(playerId);
+
+      // If player was rejoining and game was paused, resume it
+      if (isRejoining && session.players.length >= 2 && !session.turnEndsAt && !session.winnerId) {
+        // Check if current turn player is connected
+        const currentPlayer = session.players[session.currentTurn];
+        if (currentPlayer && session.connectedPlayers.has(currentPlayer.id)) {
+          startTurnTimer(session);
+        }
+      } else if (session.players.length === 2 && !session.turnEndsAt && !session.winnerId) {
+        // Start game if we have 2 players and game hasn't started
         startTurnTimer(session);
       }
 
@@ -159,8 +184,12 @@ async function start() {
       const session = sessions.get(gameId);
       if (!session) return;
 
+      const playerId = socketToPlayerId.get(socket.id);
+      if (!playerId) return;
+
       const currentPlayer = session.players[session.currentTurn];
-      if (!currentPlayer || currentPlayer.id !== socket.id) return;
+      if (!currentPlayer || currentPlayer.id !== playerId) return;
+      if (!session.connectedPlayers.has(playerId)) return; // Player must be connected
       if (session.winnerId) return;
       if (session.pendingQuestion) return; // Already has a pending question
 
@@ -214,7 +243,15 @@ async function start() {
       } else {
         // Normal field, move to next turn
         session.currentTurn = (session.currentTurn + 1) % session.players.length;
-        startTurnTimer(session);
+        
+        // Only start timer if next player is connected
+        const nextPlayer = session.players[session.currentTurn];
+        if (nextPlayer && session.connectedPlayers.has(nextPlayer.id)) {
+          startTurnTimer(session);
+        } else {
+          // Pause game if next player is not connected
+          session.turnEndsAt = undefined;
+        }
         io.to(gameId).emit("game-state", session);
       }
     });
@@ -223,13 +260,17 @@ async function start() {
       const session = sessions.get(gameId);
       if (!session) return;
       if (!session.pendingQuestion) return;
-      if (session.pendingQuestion.playerId !== socket.id) return;
+
+      const playerId = socketToPlayerId.get(socket.id);
+      if (!playerId) return;
+      if (session.pendingQuestion.playerId !== playerId) return;
+      if (!session.connectedPlayers.has(playerId)) return; // Player must be connected
 
       const question = session.questions.find((q) => q.id === questionId);
       if (!question) return;
 
       const currentPlayer = session.players.find(
-        (p) => p.id === socket.id
+        (p) => p.id === playerId
       );
       if (!currentPlayer) return;
 
@@ -282,12 +323,20 @@ async function start() {
 
       // Move to next turn - find the turn index for this player
       const playerTurnIndex = session.players.findIndex(
-        (p) => p.id === socket.id
+        (p) => p.id === playerId
       );
       if (playerTurnIndex !== -1) {
         session.currentTurn = (playerTurnIndex + 1) % session.players.length;
       }
-      startTurnTimer(session);
+      
+      // Only start timer if current player is connected
+      const nextPlayer = session.players[session.currentTurn];
+      if (nextPlayer && session.connectedPlayers.has(nextPlayer.id)) {
+        startTurnTimer(session);
+      } else {
+        // Pause game if next player is not connected
+        session.turnEndsAt = undefined;
+      }
       io.to(gameId).emit("game-state", session);
     });
 
@@ -306,7 +355,9 @@ async function start() {
       session.questionEndsAt = undefined;
       session.log = [];
 
-      if (session.players.length >= 2) {
+      // Only start timer if current player is connected
+      const currentPlayer = session.players[session.currentTurn];
+      if (session.players.length >= 2 && currentPlayer && session.connectedPlayers.has(currentPlayer.id)) {
         startTurnTimer(session);
       }
 
@@ -314,12 +365,27 @@ async function start() {
     });
 
     socket.on("disconnect", () => {
+      const playerId = socketToPlayerId.get(socket.id);
+      if (!playerId) return;
+
+      // Remove socket mapping
+      socketToPlayerId.delete(socket.id);
+
+      // Find all sessions this player is in and mark them as disconnected
       sessions.forEach((session) => {
-        session.players = session.players.filter(
-          (p) => p.id !== socket.id
-        );
-        session.currentTurn = 0;
-        io.to(session.id).emit("game-state", session);
+        if (session.connectedPlayers.has(playerId)) {
+          session.connectedPlayers.delete(playerId);
+
+          // Pause game if the disconnected player is the current turn player
+          const currentPlayer = session.players[session.currentTurn];
+          if (currentPlayer && currentPlayer.id === playerId) {
+            session.turnEndsAt = undefined;
+            session.questionEndsAt = undefined;
+            session.log.push(`⏸ ${currentPlayer.name} disconnected. Game paused.`);
+          }
+
+          io.to(session.id).emit("game-state", session);
+        }
       });
     });
   });
@@ -338,7 +404,7 @@ async function start() {
         const player = session.players.find(
           (p) => p.id === session.pendingQuestion!.playerId
         );
-        if (player) {
+        if (player && session.connectedPlayers.has(player.id)) {
           const field = session.board[player.position];
           
           // Timeout is treated as wrong answer
@@ -368,7 +434,15 @@ async function start() {
 
         session.pendingQuestion = undefined;
         session.questionEndsAt = undefined;
-        startTurnTimer(session);
+        
+        // Only start timer if next player is connected
+        const nextPlayer = session.players[session.currentTurn];
+        if (nextPlayer && session.connectedPlayers.has(nextPlayer.id)) {
+          startTurnTimer(session);
+        } else {
+          // Pause game if next player is not connected
+          session.turnEndsAt = undefined;
+        }
         io.to(session.id).emit("game-state", session);
         return;
       }
@@ -377,6 +451,13 @@ async function start() {
       if (session.turnEndsAt && now > session.turnEndsAt) {
         const player = session.players[session.currentTurn];
         if (!player) return;
+        
+        // Only process timeout if player is connected
+        if (!session.connectedPlayers.has(player.id)) {
+          // Player disconnected, pause game
+          session.turnEndsAt = undefined;
+          return;
+        }
 
         session.log.push(
           `⏱ ${player.name} skipped (turn timeout)`
@@ -385,7 +466,14 @@ async function start() {
         session.currentTurn =
           (session.currentTurn + 1) % session.players.length;
 
-        startTurnTimer(session);
+        // Only start timer if next player is connected
+        const nextPlayer = session.players[session.currentTurn];
+        if (nextPlayer && session.connectedPlayers.has(nextPlayer.id)) {
+          startTurnTimer(session);
+        } else {
+          // Pause game if next player is not connected
+          session.turnEndsAt = undefined;
+        }
         io.to(session.id).emit("game-state", session);
       }
     });

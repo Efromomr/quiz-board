@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { socket } from "./socket";
 import Board from "./Board";
 import QuestionModal from "./QuestionModal";
+import { getPlayerId } from "./playerId";
 
 
 type Player = {
@@ -41,6 +42,7 @@ export default function Lobby({
   gameId: string;
   name: string;
 }) {
+  const playerId = getPlayerId();
   const [game, setGame] = useState<GameState | null>(null);
   const [question, setQuestion] = useState<{
     fieldType: "BOOST" | "TRAP";
@@ -60,7 +62,7 @@ export default function Lobby({
 
   useEffect(() => {
   const onConnect = () => {
-    socket.emit("join-game", { gameId, name });
+    socket.emit("join-game", { gameId, name, playerId });
   };
 
   socket.on("connect", onConnect);
@@ -79,7 +81,7 @@ export default function Lobby({
 
   // If socket is already connected, emit join-game immediately
   if (socket.connected) {
-    socket.emit("join-game", { gameId, name });
+    socket.emit("join-game", { gameId, name, playerId });
   }
 
   return () => {
@@ -87,7 +89,7 @@ export default function Lobby({
     socket.off("game-state");
     socket.off("question");
   };
-}, [gameId, name]);
+}, [gameId, name, playerId]);
 
   // Clear question when time expires
   useEffect(() => {
@@ -120,7 +122,7 @@ export default function Lobby({
   if (!game) return <div className="loading">Loading game...</div>;
 
   const myTurn =
-    game.players[game.currentTurn]?.id === socket.id;
+    game.players[game.currentTurn]?.id === playerId;
 
   const activePlayer =
     game.players[game.currentTurn];
@@ -167,8 +169,8 @@ export default function Lobby({
           {game.players.map((player, index) => (
             <div key={player.id} className="player-item">
               <div className={`player-token player-color-${index % 6}`} />
-              <span className={player.id === socket.id ? "current-player" : ""}>
-                {player.name} {player.id === socket.id && "(You)"}
+              <span className={player.id === playerId ? "current-player" : ""}>
+                {player.name} {player.id === playerId && "(You)"}
               </span>
             </div>
           ))}
