@@ -48,7 +48,9 @@ export default function Home({
 
   return (
     <div className="home-container">
-      <h1>DND Multiplayer MVP</h1>
+      <h1>Quiz Board Game</h1>
+	  
+	  <p>Lucky dice rolls aren't enough to succeed in this game, you need to answer some fancy questions too! However, the more progress you make, the harder it is to deal with them</p>
 
       <input
         placeholder="Your name"
