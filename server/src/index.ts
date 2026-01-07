@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { Server } from "socket.io";
 import { createServer } from "http";
+import { initializeDatabase, getAllQuestions } from "./database";
 
 const fastify = Fastify();
 const PORT = Number(process.env.PORT) || 3001;
@@ -78,29 +79,6 @@ function createBoard(size: number): BoardField[] {
   });
 }
 
-/* ------------------ Question Bank ------------------ */
-
-const QUESTION_BANK: Question[] = [
-  {
-    id: 1,
-    text: "What is the capital of France?",
-    options: ["Berlin", "Paris", "Madrid", "Rome"],
-    correctIndex: 1
-  },
-  {
-    id: 2,
-    text: "2 + 2 = ?",
-    options: ["3", "4", "5", "6"],
-    correctIndex: 1
-  },
-  {
-    id: 3,
-    text: "Which planet is known as the Red Planet?",
-    options: ["Earth", "Venus", "Mars", "Jupiter"],
-    correctIndex: 2
-  }
-];
-
 /* ------------------ Sessions ------------------ */
 
 const sessions = new Map<string, GameSession>();
@@ -108,6 +86,13 @@ const sessions = new Map<string, GameSession>();
 /* ------------------ Bootstrap ------------------ */
 
 async function start() {
+  // Initialize database
+  initializeDatabase();
+  
+  // Log that database is ready
+  const questionCount = getAllQuestions().length;
+  console.log(`Database initialized with ${questionCount} questions`);
+  
   await fastify.register(cors, {
     origin: CLIENT_ORIGIN,
     methods: ["GET", "POST"]
@@ -117,13 +102,16 @@ async function start() {
 
   fastify.post("/create-game", async () => {
     const gameId = createGameId();
+    
+    // Load fresh questions from database for each game session
+    const questions = getAllQuestions();
 
     sessions.set(gameId, {
       id: gameId,
       players: [],
       board: createBoard(40),
       currentTurn: 0,
-      questions: QUESTION_BANK,
+      questions: questions,
       log: []
     });
 
