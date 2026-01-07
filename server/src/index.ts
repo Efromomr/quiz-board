@@ -68,15 +68,111 @@ function startTurnTimer(session: GameSession) {
   session.questionEndsAt = undefined;
 }
 
+/* ------------------ Ciphering Functions ------------------ */
+
+type CipherType = "caesar" | "mirror" | "consonants";
+
+/**
+ * Caesar cipher with one letter shift forward
+ */
+function caesarCipher(text: string): string {
+  return text
+    .split("")
+    .map((char) => {
+      if (char >= "A" && char <= "Z") {
+        return String.fromCharCode(((char.charCodeAt(0) - 65 + 1) % 26) + 65);
+      }
+      if (char >= "a" && char <= "z") {
+        return String.fromCharCode(((char.charCodeAt(0) - 97 + 1) % 26) + 97);
+      }
+      return char;
+    })
+    .join("");
+}
+
+/**
+ * Mirror each word (reverse the characters in each word)
+ */
+function mirrorWords(text: string): string {
+  return text
+    .split(" ")
+    .map((word) => {
+      // Preserve punctuation at the end
+      const match = word.match(/^([\w'-]+)([.,!?;:]*)$/);
+      if (match) {
+        const [, wordPart, punctuation] = match;
+        return wordPart.split("").reverse().join("") + punctuation;
+      }
+      return word;
+    })
+    .join(" ");
+}
+
+/**
+ * Remove all vowels, keeping only consonants
+ */
+function consonantsOnly(text: string): string {
+  return text.replace(/[aeiouAEIOU]/g, "");
+}
+
+/**
+ * Apply ciphering to text based on cipher type
+ */
+function applyCipher(text: string, cipherType: CipherType): string {
+  switch (cipherType) {
+    case "caesar":
+      return caesarCipher(text);
+    case "mirror":
+      return mirrorWords(text);
+    case "consonants":
+      return consonantsOnly(text);
+    default:
+      return text;
+  }
+}
+
+/**
+ * Determine if a question should be ciphered based on field number
+ * Probability increases with field number (proportional)
+ */
+function shouldCipherQuestion(fieldIndex: number, boardSize: number): boolean {
+  // Probability = fieldIndex / boardSize
+  // So field 0 = 0%, field 20 = 50%, field 40 = 100%
+  const probability = fieldIndex / boardSize;
+  return Math.random() < probability;
+}
+
+/**
+ * Randomly select a cipher type
+ */
+function getRandomCipherType(): CipherType {
+  const types: CipherType[] = ["caesar", "mirror", "consonants"];
+  return types[Math.floor(Math.random() * types.length)];
+}
+
 function createBoard(size: number): BoardField[] {
   return Array.from({ length: size }).map((_, i) => {
-    if (i !== 0 && i % 7 === 0) {
-      return { index: i, type: "BOOST", value: 3 };
+    // Most fields should be BOOST or TRAP
+    // Field 0 is always NORMAL (start)
+    if (i === 0) {
+      return { index: i, type: "NORMAL" };
     }
-    if (i !== 0 && i % 5 === 0) {
+    
+    // Pattern: Most fields are BOOST or TRAP
+    // Every 4th field is TRAP, every 5th field is BOOST
+    // Remaining fields alternate between BOOST and TRAP
+    // This ensures ~80% of fields are special
+    
+    if (i % 4 === 0) {
       return { index: i, type: "TRAP", value: 2 };
     }
-    return { index: i, type: "NORMAL" };
+    if (i % 5 === 0) {
+      return { index: i, type: "BOOST", value: 3 };
+    }
+    // Alternate for remaining fields
+    return i % 2 === 0 
+      ? { index: i, type: "BOOST", value: 3 }
+      : { index: i, type: "TRAP", value: 2 };
   });
 }
 
@@ -112,7 +208,7 @@ async function start() {
     sessions.set(gameId, {
       id: gameId,
       players: [],
-      board: createBoard(40),
+      board: createBoard(100),
       currentTurn: 0,
       questions: questions,
       log: [],
@@ -221,6 +317,19 @@ async function start() {
           Math.floor(Math.random() * session.questions.length)
         ];
         
+        // Determine if question should be ciphered based on field number
+        const shouldCipher = shouldCipherQuestion(newPosition, session.board.length);
+        const cipherType = shouldCipher ? getRandomCipherType() : null;
+        
+        // Apply ciphering if needed
+        let questionText = randomQuestion.text;
+        let questionOptions = [...randomQuestion.options];
+        
+        if (cipherType) {
+          questionText = applyCipher(questionText, cipherType);
+          questionOptions = questionOptions.map(option => applyCipher(option, cipherType));
+        }
+        
         session.pendingQuestion = {
           playerId: currentPlayer.id,
           questionId: randomQuestion.id
@@ -234,8 +343,8 @@ async function start() {
           value: field.value || 0,
           question: {
             id: randomQuestion.id,
-            text: randomQuestion.text,
-            options: randomQuestion.options
+            text: questionText,
+            options: questionOptions
           }
         });
 
